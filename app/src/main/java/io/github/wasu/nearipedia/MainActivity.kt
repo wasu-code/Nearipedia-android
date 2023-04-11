@@ -1,7 +1,9 @@
 package io.github.wasu.nearipedia
 import android.Manifest
+import android.app.Activity
 import android.content.Context
 import android.content.pm.PackageManager
+import android.location.LocationManager
 import android.os.Bundle
 import android.preference.PreferenceManager
 
@@ -12,7 +14,16 @@ import androidx.core.content.ContextCompat
 
 import org.osmdroid.config.Configuration.*
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.ItemizedIconOverlay
+import org.osmdroid.views.overlay.ItemizedOverlayWithFocus
+import org.osmdroid.views.overlay.OverlayItem
+import org.osmdroid.views.overlay.compass.CompassOverlay
+import org.osmdroid.views.overlay.compass.InternalCompassOrientationProvider
+import org.osmdroid.views.overlay.gestures.RotationGestureOverlay
+import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
+import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 
 import java.util.ArrayList
 
@@ -39,7 +50,50 @@ class MainActivity : AppCompatActivity() {
 
         map = findViewById<MapView>(R.id.map)
         map.setTileSource(TileSourceFactory.MAPNIK)
+
+        val mapController = map.controller
+        mapController.setZoom(16.5)
+        val startPoint = GeoPoint(getCurrentLocation(this).first, getCurrentLocation(this).second) //GeoPoint(48.8583, 2.2944);
+        mapController.setCenter(startPoint);
+
+        //User current location
+        var locationOverlay = MyLocationNewOverlay(GpsMyLocationProvider(this), map);
+        //this.mLocationOverlay.enableMyLocation(); //nie wiem co to robi ale bez tego też działa
+        map.overlays.add(locationOverlay)
+
+        //Compass overlay TODO to test
+        var compassOverlay = CompassOverlay(this, InternalCompassOrientationProvider(this), map)
+        compassOverlay.enableCompass()
+        map.overlays.add(compassOverlay)
+
+        //rotation gestures TODO to test
+        val rotationGestureOverlay = RotationGestureOverlay(map)
+        rotationGestureOverlay.isEnabled
+        map.setMultiTouchControls(true)
+        map.overlays.add(rotationGestureOverlay)
+
+        ////Icons on the map with a click listener
+        //your items
+        val items = ArrayList<OverlayItem>()
+        items.add(OverlayItem("Title", "Description", GeoPoint(37.4288, -122.0811)))
+
+        //the overlay
+        var overlay = ItemizedOverlayWithFocus<OverlayItem>(items, object:
+            ItemizedIconOverlay.OnItemGestureListener<OverlayItem> {
+            override fun onItemSingleTapUp(index:Int, item:OverlayItem):Boolean {
+                //do something
+                return true
+            }
+            override fun onItemLongPress(index:Int, item:OverlayItem):Boolean {
+                return false
+            }
+        }, this)
+        overlay.setFocusItemsOnTap(true);
+        map.overlays.add(overlay);
+
+
     }
+
 
     override fun onResume() {
         super.onResume()
@@ -92,4 +146,18 @@ class MainActivity : AppCompatActivity() {
                     REQUEST_PERMISSIONS_REQUEST_CODE);
         }
     }*/
+
+    fun getCurrentLocation(context: Context): Pair<Double, Double> {
+        val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        if (ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
+            && ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            // Permission is not granted, request it
+            ActivityCompat.requestPermissions(context as Activity, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), 100) //100 - PERMISSION_REQUEST_LOCATION
+            //return null - 0.0 will be returned instead(look below)
+        }
+        val location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER) //?: return null
+        val latitude: Double = location?.latitude ?: 0.0
+        val longitude: Double = location?.longitude ?: 0.0
+        return Pair(latitude, longitude)
+    }
 }
