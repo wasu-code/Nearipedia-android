@@ -10,6 +10,7 @@ import android.preference.PreferenceManager
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import kotlinx.coroutines.runBlocking
 //import com.niels_ole.customtileserver.R
 
 import org.osmdroid.config.Configuration.*
@@ -24,6 +25,8 @@ import org.osmdroid.views.overlay.compass.InternalCompassOrientationProvider
 import org.osmdroid.views.overlay.gestures.RotationGestureOverlay
 import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
 
 import java.util.ArrayList
 
@@ -75,7 +78,16 @@ class MainActivity : AppCompatActivity() {
         ////Icons on the map with a click listener
         //your items
         val items = ArrayList<OverlayItem>()
-        items.add(OverlayItem("Title", "Description", GeoPoint(37.4288, -122.0811)))
+        //items.add(OverlayItem("Title", "Description", GeoPoint(37.4288, -122.0811)))
+        //GET articles
+        val currentLoc = getCurrentLocation(this)
+        val articles = runBlocking {getNearbyArticles(currentLoc.first, currentLoc.second)}
+        for (article in articles){
+            items.add(OverlayItem(article.title, "desc_placeholder", GeoPoint(article.lat, article.lon)))
+        }
+        //TODO function to fetch articles for new location on click
+        //TODO set distance for article search
+
 
         //the overlay
         var overlay = ItemizedOverlayWithFocus<OverlayItem>(items, object:
@@ -85,11 +97,23 @@ class MainActivity : AppCompatActivity() {
                 return true
             }
             override fun onItemLongPress(index:Int, item:OverlayItem):Boolean {
+
+                /* TODO redirect to article or fragment with description; implement WebView?
+                val webView: WebView = findViewById(R.id.webview)
+                webView.loadUrl("http://www.google.com")
+
+                first add fragment with:
+                <WebView
+                    android:id="@+id/webview"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent" />
+                 */
                 return false
             }
         }, this)
         overlay.setFocusItemsOnTap(true);
         map.overlays.add(overlay);
+
 
 
     }
@@ -160,4 +184,18 @@ class MainActivity : AppCompatActivity() {
         val longitude: Double = location?.longitude ?: 0.0
         return Pair(latitude, longitude)
     }
+
+    suspend fun getNearbyArticles(latitude: Double, longitude: Double): List<WikipediaArticle> {
+        val retrofit = Retrofit.Builder()
+            .baseUrl("https://en.wikipedia.org/")
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            //TODO set pl. or en. etc. depending on language of system
+        val service = retrofit.create(WikipediaService::class.java)
+
+        val response = service.getNearbyArticles("$latitude|$longitude")
+
+        return response.query.geosearch
+    }
+
 }
