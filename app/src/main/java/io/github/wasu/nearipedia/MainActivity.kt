@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.location.LocationManager
 import android.os.Bundle
 import android.preference.PreferenceManager
+import android.webkit.WebView
 
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -83,7 +84,7 @@ class MainActivity : AppCompatActivity() {
         val currentLoc = getCurrentLocation(this)
         val articles = runBlocking {getNearbyArticles(currentLoc.first, currentLoc.second)}
         for (article in articles){
-            items.add(OverlayItem(article.title, "desc_placeholder", GeoPoint(article.lat, article.lon)))
+            items.add(OverlayItem(article.title, article.pageid.toString(), GeoPoint(article.lat, article.lon)))
         }
         //TODO function to fetch articles for new location on click
         //TODO set distance for article search
@@ -94,20 +95,16 @@ class MainActivity : AppCompatActivity() {
             ItemizedIconOverlay.OnItemGestureListener<OverlayItem> {
             override fun onItemSingleTapUp(index:Int, item:OverlayItem):Boolean {
                 //do something
+                val webView: WebView = findViewById(R.id.webview)
+                webView.loadUrl("https://en.wikipedia.org/?curid=${item.snippet}")
                 return true
             }
             override fun onItemLongPress(index:Int, item:OverlayItem):Boolean {
 
-                /* TODO redirect to article or fragment with description; implement WebView?
-                val webView: WebView = findViewById(R.id.webview)
-                webView.loadUrl("http://www.google.com")
+                /*val webView: WebView = findViewById(R.id.webview)
+                webView.loadUrl("https://en.wikipedia.org/?curid=${item.snippet}")*/
 
-                first add fragment with:
-                <WebView
-                    android:id="@+id/webview"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent" />
-                 */
+
                 return false
             }
         }, this)
