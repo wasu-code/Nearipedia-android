@@ -34,6 +34,7 @@ import java.util.ArrayList
 class MainActivity : AppCompatActivity() {
     private val REQUEST_PERMISSIONS_REQUEST_CODE = 1
     private lateinit var map : MapView
+    private var countrycode = "pl"
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -96,7 +97,8 @@ class MainActivity : AppCompatActivity() {
             override fun onItemSingleTapUp(index:Int, item:OverlayItem):Boolean {
                 //do something
                 val webView: WebView = findViewById(R.id.webview)
-                webView.loadUrl("https://en.wikipedia.org/?curid=${item.snippet}")
+                webView.setInitialScale(1)
+                webView.loadUrl("https://${countrycode}.wikipedia.org/?curid=${item.snippet}")
                 return true
             }
             override fun onItemLongPress(index:Int, item:OverlayItem):Boolean {
@@ -184,7 +186,7 @@ class MainActivity : AppCompatActivity() {
 
     suspend fun getNearbyArticles(latitude: Double, longitude: Double): List<WikipediaArticle> {
         val retrofit = Retrofit.Builder()
-            .baseUrl("https://en.wikipedia.org/")
+            .baseUrl("https://${countrycode}.wikipedia.org/")
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             //TODO set pl. or en. etc. depending on language of system
