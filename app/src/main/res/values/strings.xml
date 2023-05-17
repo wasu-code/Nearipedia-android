@@ -2,4 +2,6 @@
     <string name="app_name">Nearipedia</string>
     <string name="hello_message">Kliknij pinezkę na mapie by otworzyć artykuł.</string>
     <string name="search_here">Search Here</string>
+    <string name="change_language">Change Language</string>
+    <string name="system_default">System Default</string>
 </resources>

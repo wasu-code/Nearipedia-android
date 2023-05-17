@@ -12,7 +12,9 @@ import android.preference.PreferenceManager
 import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
+import android.view.View
 import android.webkit.WebView
+import android.widget.PopupMenu
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import kotlinx.coroutines.runBlocking
@@ -30,12 +32,14 @@ import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.util.*
+import kotlin.collections.ArrayList
 
 
 class MainActivity : AppCompatActivity() {
-    private val REQUEST_PERMISSIONS_REQUEST_CODE = 1
-    private lateinit var map : MapView
-    private var countrycode = "pl"
+    private val REQUEST_PERMISSIONS_REQUEST_CODE = 1;
+    private lateinit var map : MapView;
+    private var countrycode = Locale.getDefault().language;
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -69,7 +73,7 @@ class MainActivity : AppCompatActivity() {
         //this.mLocationOverlay.enableMyLocation(); //nie wiem co to robi ale bez tego też działa
         map.overlays.add(locationOverlay)
 
-        //Compass overlay TODO to test
+        //Compass overlay
         var compassOverlay = CompassOverlay(this, InternalCompassOrientationProvider(this), map)
         compassOverlay.enableCompass()
         map.overlays.add(compassOverlay)
@@ -93,7 +97,7 @@ class MainActivity : AppCompatActivity() {
         for (article in articles){
             items.add(OverlayItem(article.title, article.pageid.toString(), GeoPoint(article.lat, article.lon)))
         }
-        //TODO function to fetch articles for new location on click
+
         //TODO set distance for article search
 
 
@@ -119,7 +123,11 @@ class MainActivity : AppCompatActivity() {
         return when (item.itemId) {
             R.id.action_search_here -> {
                 // Handle location button click here
-                showArticlesHere()
+                showArticlesOnMapCenter()
+                true
+            }
+            R.id.action_change_language -> {
+                showPopupMenu()
                 true
             }
             else -> super.onOptionsItemSelected(item)
@@ -227,7 +235,7 @@ class MainActivity : AppCompatActivity() {
         map.overlays.add(overlay);
     }
 
-    private fun showArticlesHere() {
+    private fun showArticlesOnMapCenter() {
         // Your abc() function implementation
         Log.d("MainActivity", "Location button clicked")
         val mapCenter = map.getMapCenter()
@@ -239,6 +247,40 @@ class MainActivity : AppCompatActivity() {
         val webView: WebView = findViewById(R.id.webview);
         updateOverlay(items, webView)
         //points are added, older are not deleted
+    }
+
+    fun showPopupMenu() {
+        val anchorView = findViewById<View>(R.id.action_change_language)
+        val popupMenu = PopupMenu(this, anchorView)
+        popupMenu.inflate(R.menu.popup_menu)
+
+        popupMenu.setOnMenuItemClickListener { item: MenuItem ->
+            when (item.itemId) {
+                R.id.menu_system -> {
+                    countrycode = Locale.getDefault().language;
+                    reloadOverlay();
+                    true
+                }
+                R.id.menu_polish -> {
+                    countrycode = "pl"
+                    reloadOverlay();
+                    true
+                }
+                R.id.menu_english -> {
+                    countrycode = "en"
+                    reloadOverlay();
+                    true
+                }
+                else -> false
+            }
+        }
+
+        popupMenu.show()
+    }
+
+    fun reloadOverlay() {
+        map.overlays.clear();
+        showArticlesOnMapCenter()
     }
 
 }
