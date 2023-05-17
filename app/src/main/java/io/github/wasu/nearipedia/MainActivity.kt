@@ -40,6 +40,7 @@ class MainActivity : AppCompatActivity() {
     private val REQUEST_PERMISSIONS_REQUEST_CODE = 1;
     private lateinit var map : MapView;
     private var countrycode = Locale.getDefault().language;
+    private lateinit var overlay: ItemizedOverlayWithFocus<OverlayItem>;
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -214,7 +215,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateOverlay(items: ArrayList<OverlayItem>, webView: WebView){
-        var overlay = ItemizedOverlayWithFocus<OverlayItem>(items, object:
+        overlay = ItemizedOverlayWithFocus<OverlayItem>(items, object:
             ItemizedIconOverlay.OnItemGestureListener<OverlayItem> {
             override fun onItemSingleTapUp(index:Int, item:OverlayItem):Boolean {
                 //do something
@@ -279,8 +280,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun reloadOverlay() {
-        map.overlays.clear();
-        showArticlesOnMapCenter()
+        map.overlays.remove(overlay);
+        showArticlesOnMapCenter();
     }
 
 }
