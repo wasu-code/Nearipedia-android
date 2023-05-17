@@ -6,6 +6,7 @@ import android.Manifest
 import android.app.Activity
 import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Paint
 import android.location.LocationManager
 import android.os.Bundle
 import android.preference.PreferenceManager
@@ -25,6 +26,7 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.ItemizedIconOverlay
 import org.osmdroid.views.overlay.ItemizedOverlayWithFocus
 import org.osmdroid.views.overlay.OverlayItem
+import org.osmdroid.views.overlay.Polygon
 import org.osmdroid.views.overlay.compass.CompassOverlay
 import org.osmdroid.views.overlay.compass.InternalCompassOrientationProvider
 import org.osmdroid.views.overlay.gestures.RotationGestureOverlay
@@ -37,10 +39,11 @@ import kotlin.collections.ArrayList
 
 
 class MainActivity : AppCompatActivity() {
-    private val REQUEST_PERMISSIONS_REQUEST_CODE = 1;
-    private lateinit var map : MapView;
-    private var countrycode = Locale.getDefault().language;
-    private lateinit var overlay: ItemizedOverlayWithFocus<OverlayItem>;
+    private val REQUEST_PERMISSIONS_REQUEST_CODE = 1
+    private lateinit var map : MapView
+    private var languagecode = Locale.getDefault().language
+    private lateinit var overlay: ItemizedOverlayWithFocus<OverlayItem>
+    private var searchRadius = 1000
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -59,32 +62,10 @@ class MainActivity : AppCompatActivity() {
         //inflate and create the map
         setContentView(R.layout.activity_main)
 
-
-
-        map = findViewById<MapView>(R.id.map)
-        map.setTileSource(TileSourceFactory.MAPNIK)
-
-        val mapController = map.controller
-        mapController.setZoom(16.5)
-        val startPoint = GeoPoint(getCurrentLocation(this).first, getCurrentLocation(this).second) //GeoPoint(48.8583, 2.2944);
-        mapController.setCenter(startPoint);
-
-        //User current location
-        var locationOverlay = MyLocationNewOverlay(GpsMyLocationProvider(this), map);
-        //this.mLocationOverlay.enableMyLocation(); //nie wiem co to robi ale bez tego też działa
-        map.overlays.add(locationOverlay)
-
-        //Compass overlay
-        var compassOverlay = CompassOverlay(this, InternalCompassOrientationProvider(this), map)
-        compassOverlay.enableCompass()
-        map.overlays.add(compassOverlay)
-
-        //rotation gestures
-        val rotationGestureOverlay = RotationGestureOverlay(map)
-        rotationGestureOverlay.isEnabled
-        map.setMultiTouchControls(true)
-        map.overlays.add(rotationGestureOverlay)
-
+        //add bare map
+        setupMap()
+        //add overlays like +/- buttons, compass
+        setupOverlays()
 
 
         ////Icons on the map with a click listener
@@ -92,7 +73,7 @@ class MainActivity : AppCompatActivity() {
         val items = ArrayList<OverlayItem>()
         //items.add(OverlayItem("Title", "Description", GeoPoint(37.4288, -122.0811)))
 
-        //GET articles
+        //GET articles for current user's location
         val currentLoc = getCurrentLocation(this)
         val articles = runBlocking {getNearbyArticles(currentLoc.first, currentLoc.second)}
         for (article in articles){
@@ -102,16 +83,15 @@ class MainActivity : AppCompatActivity() {
         //TODO set distance for article search
 
 
+        //Web view and default massage when no article selected
+        val webView: WebView = findViewById(R.id.webview)
+        val helloMessage = resources.getString(R.string.hello_message)
+        webView.loadData("<h2 style='text-align:center; margin: 4em auto; color: gray'>${helloMessage}</h2>", "text/html", "UTF-8")
 
 
-        //Webview and default massage when no article selected
-        val webView: WebView = findViewById(R.id.webview);
-        val helloMessage = resources.getString(R.string.hello_message);
-        webView.loadData("<h2 style='text-align:center; margin: 4em auto; color: gray'>${helloMessage}</h2>", "text/html", "UTF-8");
 
-
-        // setup the overlay with clickable points
-        updateOverlay(items, webView)
+        // setup the overlay with clickable points to open in webview
+        updatePointsOverlay(items, webView)
 
     }
 
@@ -127,8 +107,12 @@ class MainActivity : AppCompatActivity() {
                 showArticlesOnMapCenter()
                 true
             }
+            R.id.action_clear_points -> {
+                reloadOverlay()
+                true
+            }
             R.id.action_change_language -> {
-                showPopupMenu()
+                showLanguageMenu()
                 true
             }
             else -> super.onOptionsItemSelected(item)
@@ -187,7 +171,38 @@ class MainActivity : AppCompatActivity() {
         }
     }*/
 
-    fun getCurrentLocation(context: Context): Pair<Double, Double> {
+    private fun setupMap() {
+        map = findViewById(R.id.map)
+        map.setTileSource(TileSourceFactory.MAPNIK)
+
+        val mapController = map.controller
+        mapController.setZoom(16.5)
+        val startPoint = GeoPoint(
+            getCurrentLocation(this).first,
+            getCurrentLocation(this).second
+        ) //GeoPoint(48.8583, 2.2944);
+        mapController.setCenter(startPoint)
+    }
+
+    private fun setupOverlays() {
+        //User current location
+        val locationOverlay = MyLocationNewOverlay(GpsMyLocationProvider(this), map)
+        //this.mLocationOverlay.enableMyLocation(); //nie wiem co to robi ale bez tego też działa
+        map.overlays.add(locationOverlay)
+
+        //Compass overlay
+        val compassOverlay = CompassOverlay(this, InternalCompassOrientationProvider(this), map)
+        compassOverlay.enableCompass()
+        map.overlays.add(compassOverlay)
+
+        //rotation gestures
+        val rotationGestureOverlay = RotationGestureOverlay(map)
+        rotationGestureOverlay.isEnabled
+        map.setMultiTouchControls(true)
+        map.overlays.add(rotationGestureOverlay)
+    }
+
+    private fun getCurrentLocation(context: Context): Pair<Double, Double> {
         val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
         if (ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
             && ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
@@ -201,26 +216,38 @@ class MainActivity : AppCompatActivity() {
         return Pair(latitude, longitude)
     }
 
-    suspend fun getNearbyArticles(latitude: Double, longitude: Double): List<WikipediaArticle> {
+    private suspend fun getNearbyArticles(latitude: Double, longitude: Double): List<WikipediaArticle> {
         val retrofit = Retrofit.Builder()
-            .baseUrl("https://${countrycode}.wikipedia.org/")
+            .baseUrl("https://${languagecode}.wikipedia.org/")
             .addConverterFactory(GsonConverterFactory.create())
             .build()
-            //TODO set pl. or en. etc. depending on language of system
         val service = retrofit.create(WikipediaService::class.java)
 
-        val response = service.getNearbyArticles("$latitude|$longitude")
+        val response = service.getNearbyArticles("$latitude|$longitude", searchRadius)
 
         return response.query.geosearch
     }
 
-    private fun updateOverlay(items: ArrayList<OverlayItem>, webView: WebView){
+    private fun showArticlesOnMapCenter() {
+        val mapCenter = map.mapCenter
+        val items = ArrayList<OverlayItem>()
+        val articles = runBlocking {getNearbyArticles(mapCenter.latitude, mapCenter.longitude)}
+        for (article in articles){
+            items.add(OverlayItem(article.title, article.pageid.toString(), GeoPoint(article.lat, article.lon)))
+        }
+        val webView: WebView = findViewById(R.id.webview)
+        drawRadiusIndicatingCircle()
+        updatePointsOverlay(items, webView)
+        //points are added, older are not deleted
+    }
+
+    private fun updatePointsOverlay(items: ArrayList<OverlayItem>, webView: WebView){
         overlay = ItemizedOverlayWithFocus<OverlayItem>(items, object:
             ItemizedIconOverlay.OnItemGestureListener<OverlayItem> {
             override fun onItemSingleTapUp(index:Int, item:OverlayItem):Boolean {
                 //do something
                 webView.setInitialScale(1)
-                webView.loadUrl("https://${countrycode}.wikipedia.org/?curid=${item.snippet}")
+                webView.loadUrl("https://${languagecode}.wikipedia.org/?curid=${item.snippet}")
                 return true
             }
             override fun onItemLongPress(index:Int, item:OverlayItem):Boolean {
@@ -232,25 +259,12 @@ class MainActivity : AppCompatActivity() {
                 return false
             }
         }, this)
-        overlay.setFocusItemsOnTap(true);
-        map.overlays.add(overlay);
+
+        overlay.setFocusItemsOnTap(true)
+        map.overlays.add(overlay)
     }
 
-    private fun showArticlesOnMapCenter() {
-        // Your abc() function implementation
-        Log.d("MainActivity", "Location button clicked")
-        val mapCenter = map.getMapCenter()
-        val items = ArrayList<OverlayItem>()
-        val articles = runBlocking {getNearbyArticles(mapCenter.latitude, mapCenter.longitude)}
-        for (article in articles){
-            items.add(OverlayItem(article.title, article.pageid.toString(), GeoPoint(article.lat, article.lon)))
-        }
-        val webView: WebView = findViewById(R.id.webview);
-        updateOverlay(items, webView)
-        //points are added, older are not deleted
-    }
-
-    fun showPopupMenu() {
+    private fun showLanguageMenu() {
         val anchorView = findViewById<View>(R.id.action_change_language)
         val popupMenu = PopupMenu(this, anchorView)
         popupMenu.inflate(R.menu.popup_menu)
@@ -258,18 +272,18 @@ class MainActivity : AppCompatActivity() {
         popupMenu.setOnMenuItemClickListener { item: MenuItem ->
             when (item.itemId) {
                 R.id.menu_system -> {
-                    countrycode = Locale.getDefault().language;
-                    reloadOverlay();
+                    languagecode = Locale.getDefault().language
+                    reloadOverlay()
                     true
                 }
                 R.id.menu_polish -> {
-                    countrycode = "pl"
-                    reloadOverlay();
+                    languagecode = "pl"
+                    reloadOverlay()
                     true
                 }
                 R.id.menu_english -> {
-                    countrycode = "en"
-                    reloadOverlay();
+                    languagecode = "en"
+                    reloadOverlay()
                     true
                 }
                 else -> false
@@ -279,9 +293,41 @@ class MainActivity : AppCompatActivity() {
         popupMenu.show()
     }
 
-    fun reloadOverlay() {
-        map.overlays.remove(overlay);
-        showArticlesOnMapCenter();
+    private fun reloadOverlay() {
+        val temp = map.overlays.first() //preserve user's location overlay
+        map.overlays.clear() //clear all overlays
+        map.overlays.add(temp)
+        setupOverlays() //restore rest of overlays
+        showArticlesOnMapCenter()
+    }
+
+    private fun drawRadiusIndicatingCircle() {
+
+        // Calculate the latitude and longitude for the center point of the circle
+        val centerLatitude = map.mapCenter.latitude
+        val centerLongitude = map.mapCenter.longitude
+
+        // Calculate the coordinates for the circle using the center point and radius
+        val radiusInMeters = searchRadius.toDouble()
+        val strokeWidth = 4
+        val strokeColor = 0x80808080
+
+        val circlePoints = ArrayList<GeoPoint>()
+        for (i in 0..360) {
+            val point = GeoPoint(centerLatitude, centerLongitude).destinationPoint(radiusInMeters, i.toDouble())
+            circlePoints.add(point)
+        }
+
+        // Create a Polygon or Polyline object using the circle points
+        val circleOverlay = Polygon().apply {
+            points = circlePoints
+        }
+        circleOverlay.outlinePaint.color = strokeColor.toInt()
+        circleOverlay.outlinePaint.strokeWidth = strokeWidth.toFloat()
+        circleOverlay.outlinePaint.style = Paint.Style.STROKE
+
+        map.overlays.add(circleOverlay)
+        //map.invalidate() // Refresh the map view
     }
 
 }

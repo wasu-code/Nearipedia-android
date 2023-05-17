@@ -1,7 +1,8 @@
 <resources>
     <string name="app_name">Nearipedia</string>
     <string name="hello_message">Click a pin on the map to open an article.</string>
-    <string name="search_here">Search Here</string>
+    <string name="search_here">Search Here (add new points to map)</string>
     <string name="change_language">Change Language</string>
     <string name="system_default">System Default</string>
+    <string name="clear_points">Clear old points and show new</string>
 </resources>
