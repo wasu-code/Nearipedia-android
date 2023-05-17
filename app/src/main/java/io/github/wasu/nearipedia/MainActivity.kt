@@ -1,4 +1,7 @@
 package io.github.wasu.nearipedia
+
+//import com.niels_ole.customtileserver.R
+
 import android.Manifest
 import android.app.Activity
 import android.content.Context
@@ -6,14 +9,13 @@ import android.content.pm.PackageManager
 import android.location.LocationManager
 import android.os.Bundle
 import android.preference.PreferenceManager
+import android.util.Log
+import android.view.Menu
+import android.view.MenuItem
 import android.webkit.WebView
-
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
 import kotlinx.coroutines.runBlocking
-//import com.niels_ole.customtileserver.R
-
 import org.osmdroid.config.Configuration.*
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
@@ -29,7 +31,6 @@ import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
-import java.util.ArrayList
 
 class MainActivity : AppCompatActivity() {
     private val REQUEST_PERMISSIONS_REQUEST_CODE = 1
@@ -53,6 +54,8 @@ class MainActivity : AppCompatActivity() {
         //inflate and create the map
         setContentView(R.layout.activity_main)
 
+
+
         map = findViewById<MapView>(R.id.map)
         map.setTileSource(TileSourceFactory.MAPNIK)
 
@@ -71,16 +74,19 @@ class MainActivity : AppCompatActivity() {
         compassOverlay.enableCompass()
         map.overlays.add(compassOverlay)
 
-        //rotation gestures TODO to test
+        //rotation gestures
         val rotationGestureOverlay = RotationGestureOverlay(map)
         rotationGestureOverlay.isEnabled
         map.setMultiTouchControls(true)
         map.overlays.add(rotationGestureOverlay)
 
+
+
         ////Icons on the map with a click listener
         //your items
         val items = ArrayList<OverlayItem>()
         //items.add(OverlayItem("Title", "Description", GeoPoint(37.4288, -122.0811)))
+
         //GET articles
         val currentLoc = getCurrentLocation(this)
         val articles = runBlocking {getNearbyArticles(currentLoc.first, currentLoc.second)}
@@ -91,32 +97,34 @@ class MainActivity : AppCompatActivity() {
         //TODO set distance for article search
 
 
-        //the overlay
-        var overlay = ItemizedOverlayWithFocus<OverlayItem>(items, object:
-            ItemizedIconOverlay.OnItemGestureListener<OverlayItem> {
-            override fun onItemSingleTapUp(index:Int, item:OverlayItem):Boolean {
-                //do something
-                val webView: WebView = findViewById(R.id.webview)
-                webView.setInitialScale(1)
-                webView.loadUrl("https://${countrycode}.wikipedia.org/?curid=${item.snippet}")
-                return true
-            }
-            override fun onItemLongPress(index:Int, item:OverlayItem):Boolean {
-
-                /*val webView: WebView = findViewById(R.id.webview)
-                webView.loadUrl("https://en.wikipedia.org/?curid=${item.snippet}")*/
 
 
-                return false
-            }
-        }, this)
-        overlay.setFocusItemsOnTap(true);
-        map.overlays.add(overlay);
+        //Webview and default massage when no article selected
+        val webView: WebView = findViewById(R.id.webview);
+        val helloMessage = resources.getString(R.string.hello_message);
+        webView.loadData("<h2 style='text-align:center; margin: 4em auto; color: gray'>${helloMessage}</h2>", "text/html", "UTF-8");
 
 
+        // setup the overlay with clickable points
+        updateOverlay(items, webView)
 
     }
 
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.menu_main, menu)
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_search_here -> {
+                // Handle location button click here
+                showArticlesHere()
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
 
     override fun onResume() {
         super.onResume()
@@ -195,6 +203,42 @@ class MainActivity : AppCompatActivity() {
         val response = service.getNearbyArticles("$latitude|$longitude")
 
         return response.query.geosearch
+    }
+
+    private fun updateOverlay(items: ArrayList<OverlayItem>, webView: WebView){
+        var overlay = ItemizedOverlayWithFocus<OverlayItem>(items, object:
+            ItemizedIconOverlay.OnItemGestureListener<OverlayItem> {
+            override fun onItemSingleTapUp(index:Int, item:OverlayItem):Boolean {
+                //do something
+                webView.setInitialScale(1)
+                webView.loadUrl("https://${countrycode}.wikipedia.org/?curid=${item.snippet}")
+                return true
+            }
+            override fun onItemLongPress(index:Int, item:OverlayItem):Boolean {
+
+                /*val webView: WebView = findViewById(R.id.webview)
+                webView.loadUrl("https://en.wikipedia.org/?curid=${item.snippet}")*/
+
+
+                return false
+            }
+        }, this)
+        overlay.setFocusItemsOnTap(true);
+        map.overlays.add(overlay);
+    }
+
+    private fun showArticlesHere() {
+        // Your abc() function implementation
+        Log.d("MainActivity", "Location button clicked")
+        val mapCenter = map.getMapCenter()
+        val items = ArrayList<OverlayItem>()
+        val articles = runBlocking {getNearbyArticles(mapCenter.latitude, mapCenter.longitude)}
+        for (article in articles){
+            items.add(OverlayItem(article.title, article.pageid.toString(), GeoPoint(article.lat, article.lon)))
+        }
+        val webView: WebView = findViewById(R.id.webview);
+        updateOverlay(items, webView)
+        //points are added, older are not deleted
     }
 
 }
