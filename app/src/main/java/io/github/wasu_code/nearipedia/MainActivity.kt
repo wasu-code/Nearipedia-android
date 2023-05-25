@@ -17,7 +17,6 @@ import android.webkit.WebView
 import android.widget.PopupMenu
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
-import io.github.wasu.nearipedia.R
 import kotlinx.coroutines.runBlocking
 import org.osmdroid.config.Configuration.*
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory

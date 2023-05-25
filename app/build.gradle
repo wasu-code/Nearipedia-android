@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace 'io.github.wasu.nearipedia'
+    namespace 'io.github.wasu_code.nearipedia'
     compileSdk 33
 
     defaultConfig {
-        applicationId "io.github.wasu.nearipedia"
+        applicationId "io.github.wasu_code.nearipedia"
         minSdk 24
         targetSdk 33
         versionCode 1
