@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/menu_system"
+        android:title="@string/system_default"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/menu_english"
+        android:title="English"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/menu_polish"
+        android:title="Polski"
+        app:showAsAction="never" />
+</menu>

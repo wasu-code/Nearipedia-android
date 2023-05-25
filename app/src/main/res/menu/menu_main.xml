@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/action_clear_points"
+        android:icon="@drawable/ic_replace_points"
+        android:title="@string/clear_points"
+        app:showAsAction="always" />
+
+    <item
+        android:id="@+id/action_search_here"
+        android:icon="@drawable/ic_add_points"
+        android:title="@string/search_here"
+        app:showAsAction="always" />
+
+    <item
+        android:id="@+id/action_change_language"
+        android:icon="@drawable/ic_language"
+        android:title="@string/change_language"
+        app:showAsAction="always" />
+
+
+</menu>

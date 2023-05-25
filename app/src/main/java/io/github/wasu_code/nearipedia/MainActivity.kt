@@ -1,4 +1,4 @@
-package io.github.wasu.nearipedia
+package io.github.wasu_code.nearipedia
 
 //import com.niels_ole.customtileserver.R
 
@@ -10,7 +10,6 @@ import android.graphics.Paint
 import android.location.LocationManager
 import android.os.Bundle
 import android.preference.PreferenceManager
-import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
@@ -18,6 +17,7 @@ import android.webkit.WebView
 import android.widget.PopupMenu
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import io.github.wasu.nearipedia.R
 import kotlinx.coroutines.runBlocking
 import org.osmdroid.config.Configuration.*
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory

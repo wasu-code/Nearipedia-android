@@ -1,4 +1,4 @@
-package io.github.wasu.nearipedia
+package io.github.wasu_code.nearipedia
 
 import org.junit.Test
 

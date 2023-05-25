@@ -1,4 +1,4 @@
-package io.github.wasu.nearipedia
+package io.github.wasu_code.nearipedia
 
 import retrofit2.http.GET
 import retrofit2.http.Query

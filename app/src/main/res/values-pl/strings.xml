@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">Nearipedia</string>
+    <string name="hello_message">Kliknij pinezkę na mapie by otworzyć artykuł.</string>
+    <string name="search_here">Szukaj Tutaj (dodaje nowe punkty na mapie)</string>
+    <string name="change_language">Zmień Język</string>
+    <string name="system_default">Domyślny Systemowy</string>
+    <string name="clear_points">Wyczyść poprzednie punkty i pokaż nowe</string>
+</resources>

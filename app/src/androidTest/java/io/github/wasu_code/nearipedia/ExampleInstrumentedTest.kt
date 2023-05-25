@@ -1,4 +1,4 @@
-package io.github.wasu.nearipedia
+package io.github.wasu_code.nearipedia
 
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4

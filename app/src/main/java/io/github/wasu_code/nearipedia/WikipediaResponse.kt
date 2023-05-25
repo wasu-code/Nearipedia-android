@@ -1,4 +1,4 @@
-package io.github.wasu.nearipedia
+package io.github.wasu_code.nearipedia
 
 data class WikipediaResponse(
     val query: WikipediaQuery
