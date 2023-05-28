@@ -5,4 +5,5 @@
     <string name="change_language">Change Language</string>
     <string name="system_default">System Default</string>
     <string name="clear_points">Clear old points and show new</string>
+    <string name="toast_location_permission">Location permission is mandatory for using this application</string>
 </resources>

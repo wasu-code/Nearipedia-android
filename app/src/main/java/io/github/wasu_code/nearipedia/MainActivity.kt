@@ -10,11 +10,13 @@ import android.graphics.Paint
 import android.location.LocationManager
 import android.os.Bundle
 import android.preference.PreferenceManager
+import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.webkit.WebView
 import android.widget.PopupMenu
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import kotlinx.coroutines.runBlocking
@@ -38,15 +40,19 @@ import kotlin.collections.ArrayList
 
 
 class MainActivity : AppCompatActivity() {
-    private val REQUEST_PERMISSIONS_REQUEST_CODE = 1
     private lateinit var map : MapView
-    private var languagecode = Locale.getDefault().language
+    private var languagecode = Locale.getDefault().language //code of language used when displaying articles
     private lateinit var overlay: ItemizedOverlayWithFocus<OverlayItem>
-    private var searchRadius = 1000
+    private var searchRadius = 1000 //radious in meters to search for articles around given location
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        //handle permissions first, before map is created. not depicted here
+        //handle permissions first, before map is created.
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
+            && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            // Permission is not granted, request it
+            ActivityCompat.requestPermissions(this as Activity, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), 100)
+        }
 
         //load/initialize the osmdroid configuration, this can be done
         // This won't work unless you have imported this: org.osmdroid.config.Configuration.*
@@ -70,7 +76,7 @@ class MainActivity : AppCompatActivity() {
         ////Icons on the map with a click listener
         //your items
         val items = ArrayList<OverlayItem>()
-        //items.add(OverlayItem("Title", "Description", GeoPoint(37.4288, -122.0811)))
+        //Example use: items.add(OverlayItem("Title", "Description", GeoPoint(37.4288, -122.0811)))
 
         //GET articles for current user's location
         val currentLoc = getCurrentLocation(this)
@@ -138,37 +144,20 @@ class MainActivity : AppCompatActivity() {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        val permissionsToRequest = ArrayList<String>()
-        var i = 0
-        while (i < grantResults.size) {
-            permissionsToRequest.add(permissions[i])
-            i++
-        }
-        if (permissionsToRequest.size > 0) {
-            ActivityCompat.requestPermissions(
+
+        if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            // Permission granted
+        } else {
+            // Permission denied
+            Toast.makeText(
                 this,
-                permissionsToRequest.toTypedArray(),
-                REQUEST_PERMISSIONS_REQUEST_CODE)
+                getString(R.string.toast_location_permission),
+                Toast.LENGTH_SHORT
+            ).show()
+            //finish()
         }
-    }
 
-
-    /*private fun requestPermissionsIfNecessary(String[] permissions) {
-        val permissionsToRequest = ArrayList<String>();
-        permissions.forEach { permission ->
-        if (ContextCompat.checkSelfPermission(this, permission)
-                != PackageManager.PERMISSION_GRANTED) {
-            // Permission is not granted
-            permissionsToRequest.add(permission);
-        }
     }
-        if (permissionsToRequest.size() > 0) {
-            ActivityCompat.requestPermissions(
-                    this,
-                    permissionsToRequest.toArray(new String[0]),
-                    REQUEST_PERMISSIONS_REQUEST_CODE);
-        }
-    }*/
 
     private fun setupMap() {
         map = findViewById(R.id.map)
@@ -179,14 +168,13 @@ class MainActivity : AppCompatActivity() {
         val startPoint = GeoPoint(
             getCurrentLocation(this).first,
             getCurrentLocation(this).second
-        ) //GeoPoint(48.8583, 2.2944);
+        )
         mapController.setCenter(startPoint)
     }
 
     private fun setupOverlays() {
         //User current location
         val locationOverlay = MyLocationNewOverlay(GpsMyLocationProvider(this), map)
-        //this.mLocationOverlay.enableMyLocation(); //nie wiem co to robi ale bez tego też działa
         map.overlays.add(locationOverlay)
 
         //Compass overlay
@@ -206,10 +194,9 @@ class MainActivity : AppCompatActivity() {
         if (ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
             && ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             // Permission is not granted, request it
-            ActivityCompat.requestPermissions(context as Activity, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), 100) //100 - PERMISSION_REQUEST_LOCATION
-            //return null - 0.0 will be returned instead(look below)
+            ActivityCompat.requestPermissions(context as Activity, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), 100)
         }
-        val location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER) //?: return null
+        val location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER) //returns null when no permissions - 0.0 will be returned instead(look below)
         val latitude: Double = location?.latitude ?: 0.0
         val longitude: Double = location?.longitude ?: 0.0
         return Pair(latitude, longitude)
@@ -244,17 +231,13 @@ class MainActivity : AppCompatActivity() {
         overlay = ItemizedOverlayWithFocus<OverlayItem>(items, object:
             ItemizedIconOverlay.OnItemGestureListener<OverlayItem> {
             override fun onItemSingleTapUp(index:Int, item:OverlayItem):Boolean {
-                //do something
                 webView.setInitialScale(1)
                 webView.loadUrl("https://${languagecode}.wikipedia.org/?curid=${item.snippet}")
                 return true
             }
             override fun onItemLongPress(index:Int, item:OverlayItem):Boolean {
-
-                /*val webView: WebView = findViewById(R.id.webview)
-                webView.loadUrl("https://en.wikipedia.org/?curid=${item.snippet}")*/
-
-
+                //do something on long pressing location marker
+                //TODO add article to favorites
                 return false
             }
         }, this)
@@ -295,7 +278,7 @@ class MainActivity : AppCompatActivity() {
     private fun reloadOverlay() {
         val temp = map.overlays.first() //preserve user's location overlay
         map.overlays.clear() //clear all overlays
-        map.overlays.add(temp)
+        map.overlays.add(temp) //restores user's location; clearing and readding it may not work correctly
         setupOverlays() //restore rest of overlays
         showArticlesOnMapCenter()
     }

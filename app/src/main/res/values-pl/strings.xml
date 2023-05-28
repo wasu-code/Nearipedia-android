@@ -5,4 +5,5 @@
     <string name="change_language">Zmień Język</string>
     <string name="system_default">Domyślny Systemowy</string>
     <string name="clear_points">Wyczyść poprzednie punkty i pokaż nowe</string>
+    <string name="toast_location_permission">Uprawnienia lokalizacji są niezbędne do urzywania tej aplikacji</string>
 </resources>
