@@ -34,7 +34,11 @@ import java.util.*
 import kotlin.collections.ArrayList
 import android.view.MotionEvent
 import android.widget.LinearLayout
+import androidx.lifecycle.lifecycleScope
 import androidx.slidingpanelayout.widget.SlidingPaneLayout
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.osmdroid.config.Configuration
 
 class MainActivity : AppCompatActivity() {
@@ -44,60 +48,18 @@ class MainActivity : AppCompatActivity() {
     private var languagecode = Locale.getDefault().language //code of language used when displaying articles
     private lateinit var overlay: ItemizedOverlayWithFocus<OverlayItem>
     private var searchRadius = 1000 //radious in meters to search for articles around given location
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-
-        //handle permissions first, before map is created.
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
-            && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            // Permission is not granted, request it
-            ActivityCompat.requestPermissions(this as Activity, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), 100)
-        }
-
-        //load/initialize the osmdroid configuration
-        val sharedPreferences = getSharedPreferences("prefs", Context.MODE_PRIVATE)
-        Configuration.getInstance().load(this, sharedPreferences)
-        //setting this before the layout is inflated is a good idea
-        //it 'should' ensure that the map has a writable location for the map cache, even without permissions
-
-        //inflate and create the map
-        setContentView(R.layout.activity_main)
-
-        //add bare map
+        requestLocationPermission()
+        initializeMapConfig()
+        setContentView(R.layout.activity_main) //inflate and create the map
+        initializeWebView()
+        initializeSlidingPanel()
         setupMap()
-        //add overlays like +/- buttons, compass
-        setupOverlays()
-
-
-        ////Icons on the map with a click listener
-        //your items
-        val items = ArrayList<OverlayItem>()
-        //Example use: items.add(OverlayItem("Title", "Description", GeoPoint(37.4288, -122.0811)))
-
-        //GET articles for current user's location
-        val currentLoc = getCurrentLocation(this)
-        val articles = runBlocking {getNearbyArticles(currentLoc.first, currentLoc.second)}
-        for (article in articles){
-            items.add(OverlayItem(article.title, article.pageid.toString(), GeoPoint(article.lat, article.lon)))
-        }
-
-        //TODO set distance for article search
-
-
-        //Web view and default massage when no article selected
-        webView = findViewById(R.id.webview)
-        val helloMessage = resources.getString(R.string.hello_message)
-        webView.loadData("<h2 style='text-align:center; margin: 2em auto; color: gray'>${helloMessage.replace("\n", "<br>")}</h2>", "text/html", "UTF-8")
-
-
-
-        // setup the overlay with clickable points to open in webview
-        updatePointsOverlay(items, webView)
-
-        slidingPaneLayout = findViewById(R.id.sliding_panel_layout)
-        val divider: View = findViewById(R.id.divider)
-        divider.setOnTouchListener(ResizeTouchListener())
+        setupOverlays() //add overlays like +/- buttons, compass
+        loadInitialArticles()//Icons on the map with a click listener
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -153,16 +115,66 @@ class MainActivity : AppCompatActivity() {
 
     }
 
+    ////
+
+    private fun requestLocationPermission() {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+            != PackageManager.PERMISSION_GRANTED &&
+            ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
+            != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), 100)
+        }
+    }
+
+    private fun initializeMapConfig() {
+        val sharedPreferences = getSharedPreferences("prefs", Context.MODE_PRIVATE)
+        Configuration.getInstance().load(this, sharedPreferences)
+    }
+
+    private fun initializeWebView() {
+        webView = findViewById(R.id.webview)
+        val helloMessage = resources.getString(R.string.hello_message)
+        webView.loadData(
+            "<h2 style='text-align:center; margin: 2em auto; color: gray'>${helloMessage.replace("\n", "<br>")}</h2>",
+            "text/html",
+            "UTF-8"
+        )
+    }
+
+    private fun loadInitialArticles() {
+        lifecycleScope.launch {
+            val currentLoc = getCurrentLocation(this@MainActivity)
+            try {
+                val articles = getNearbyArticles(currentLoc.first, currentLoc.second)
+                val items = articles.map {
+                    OverlayItem(it.title, it.pageid.toString(), GeoPoint(it.lat, it.lon))
+                }
+                updatePointsOverlay(items, webView)
+            } catch (e: Exception) {
+                Toast.makeText(this@MainActivity, "Failed to load nearby articles", Toast.LENGTH_SHORT).show()
+                e.printStackTrace()
+            }
+        }
+
+        //TODO set distance for article search
+    }
+
+    private fun initializeSlidingPanel() {
+        slidingPaneLayout = findViewById(R.id.sliding_panel_layout)
+        val divider: View = findViewById(R.id.divider)
+        divider.setOnTouchListener(ResizeTouchListener())
+    }
+
+
     private fun setupMap() {
         map = findViewById(R.id.map)
         map.setTileSource(TileSourceFactory.MAPNIK)
 
         val mapController = map.controller
         mapController.setZoom(16.5)
-        val startPoint = GeoPoint(
-            getCurrentLocation(this).first,
-            getCurrentLocation(this).second
-        )
+
+        val (lat, lon) = getCurrentLocation(this)
+        val startPoint = GeoPoint(lat, lon)
         mapController.setCenter(startPoint)
     }
 
@@ -197,15 +209,23 @@ class MainActivity : AppCompatActivity() {
     }
 
     private suspend fun getNearbyArticles(latitude: Double, longitude: Double): List<WikipediaArticle> {
-        val retrofit = Retrofit.Builder()
-            .baseUrl("https://${languagecode}.wikipedia.org/")
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-        val service = retrofit.create(WikipediaService::class.java)
+        return try {
+            val retrofit = Retrofit.Builder()
+                .baseUrl("https://${languagecode}.wikipedia.org/")
+                .addConverterFactory(GsonConverterFactory.create())
+                .build()
+            val service = retrofit.create(WikipediaService::class.java)
 
-        val response = service.getNearbyArticles("$latitude|$longitude", searchRadius)
+            val response = service.getNearbyArticles("$latitude|$longitude", searchRadius)
 
-        return response.query.geosearch
+            response.query.geosearch
+        } catch (e: Exception) {
+            e.printStackTrace()
+            withContext(Dispatchers.Main) {
+                Toast.makeText(this@MainActivity, "Failed to fetch nearby articles", Toast.LENGTH_SHORT).show()
+            }
+            emptyList()
+        }
     }
 
     private fun showArticlesOnMapCenter() {
@@ -221,8 +241,8 @@ class MainActivity : AppCompatActivity() {
         //points are added, older are not deleted
     }
 
-    private fun updatePointsOverlay(items: ArrayList<OverlayItem>, webView: WebView){
-        overlay = ItemizedOverlayWithFocus<OverlayItem>(items, object:
+    private fun updatePointsOverlay(items: List<OverlayItem>, webView: WebView){
+        overlay = ItemizedOverlayWithFocus(items, object:
             ItemizedIconOverlay.OnItemGestureListener<OverlayItem> {
             override fun onItemSingleTapUp(index:Int, item:OverlayItem):Boolean {
                 webView.setInitialScale(1)
