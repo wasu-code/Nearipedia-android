@@ -7,17 +7,27 @@ import android.content.pm.PackageManager
 import android.graphics.Paint
 import android.location.LocationManager
 import android.os.Bundle
+import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
+import android.view.MotionEvent
 import android.view.View
 import android.webkit.WebView
+import android.widget.LinearLayout
 import android.widget.PopupMenu
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import androidx.lifecycle.lifecycleScope
+import androidx.slidingpanelayout.widget.SlidingPaneLayout
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import kotlinx.coroutines.withContext
+import org.osmdroid.config.Configuration
+import org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase
 import org.osmdroid.util.GeoPoint
+import org.osmdroid.util.MapTileIndex
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.ItemizedIconOverlay
 import org.osmdroid.views.overlay.ItemizedOverlayWithFocus
@@ -30,16 +40,8 @@ import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
-import java.util.*
-import kotlin.collections.ArrayList
-import android.view.MotionEvent
-import android.widget.LinearLayout
-import androidx.lifecycle.lifecycleScope
-import androidx.slidingpanelayout.widget.SlidingPaneLayout
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import org.osmdroid.config.Configuration
+import java.util.Locale
+
 
 class MainActivity : AppCompatActivity() {
     private lateinit var map : MapView
@@ -168,7 +170,33 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupMap() {
         map = findViewById(R.id.map)
-        map.setTileSource(TileSourceFactory.MAPNIK)
+
+
+//        // Custom TileSource URL
+//        val customTileUrl = "https://a.tile.openstreetmap.de/{z}/{x}/{y}.png"
+//        // Create a new TileSource using your custom URL
+//        val customTileSource: ITileSource =
+//            XYTileSource("OpenStreetMap.de", 0, 18, 256, ".png", arrayOf(customTileUrl))
+//        map.setTileSource(customTileSource);
+
+//        map.setTileSource(TileSourceFactory.MAPNIK)
+
+        map.setTileSource(object : OnlineTileSourceBase(
+            "OpenStreetMap.de", 0, 18, 256, "png",
+            arrayOf<String>("https://a.tile.openstreetmap.de/")
+        ) {
+            override fun getTileURLString(pMapTileIndex: Long): String {
+                val url = (baseUrl
+                        + MapTileIndex.getZoom(pMapTileIndex)
+                        + "/" + MapTileIndex.getX(pMapTileIndex)
+                        + "/" + MapTileIndex.getY(pMapTileIndex)
+                        + "." + mImageFilenameEnding)
+
+                Log.i("MAP_EXAMPLE", url)
+
+                return url
+            }
+        })
 
         val mapController = map.controller
         mapController.setZoom(16.5)
