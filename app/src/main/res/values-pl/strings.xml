@@ -1,6 +1,6 @@
 <resources>
     <string name="app_name">Nearipedia</string>
-    <string name="hello_message">Kliknij pinezkę na mapie by otworzyć artykuł.</string>
+    <string name="hello_message">Przesuń mapę i użyj ikon w górnej części ekranu by wyszukać artykuły. \n\n Kliknij znacznik by przeczytać artykuł. \n\n Przeciągnij pasek między panelami by zmieniać rozmiar. \n\n Zmień język by zobaczyć obcojęzyczne artykuły.</string>
     <string name="search_here">Szukaj Tutaj (dodaje nowe punkty na mapie)</string>
     <string name="change_language">Zmień Język</string>
     <string name="system_default">Domyślny Systemowy</string>

@@ -1,7 +1,5 @@
 package io.github.wasu_code.nearipedia
 
-//import com.niels_ole.customtileserver.R
-
 import android.Manifest
 import android.app.Activity
 import android.content.Context
@@ -9,8 +7,6 @@ import android.content.pm.PackageManager
 import android.graphics.Paint
 import android.location.LocationManager
 import android.os.Bundle
-import android.preference.PreferenceManager
-import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
@@ -20,7 +16,6 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import kotlinx.coroutines.runBlocking
-import org.osmdroid.config.Configuration.*
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
@@ -37,15 +32,21 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.*
 import kotlin.collections.ArrayList
-
+import android.view.MotionEvent
+import android.widget.LinearLayout
+import androidx.slidingpanelayout.widget.SlidingPaneLayout
+import org.osmdroid.config.Configuration
 
 class MainActivity : AppCompatActivity() {
     private lateinit var map : MapView
+    private lateinit var webView: WebView
+    private lateinit var slidingPaneLayout: SlidingPaneLayout
     private var languagecode = Locale.getDefault().language //code of language used when displaying articles
     private lateinit var overlay: ItemizedOverlayWithFocus<OverlayItem>
     private var searchRadius = 1000 //radious in meters to search for articles around given location
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
 
         //handle permissions first, before map is created.
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
@@ -54,15 +55,11 @@ class MainActivity : AppCompatActivity() {
             ActivityCompat.requestPermissions(this as Activity, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), 100)
         }
 
-        //load/initialize the osmdroid configuration, this can be done
-        // This won't work unless you have imported this: org.osmdroid.config.Configuration.*
-        getInstance().load(this, PreferenceManager.getDefaultSharedPreferences(this))
+        //load/initialize the osmdroid configuration
+        val sharedPreferences = getSharedPreferences("prefs", Context.MODE_PRIVATE)
+        Configuration.getInstance().load(this, sharedPreferences)
         //setting this before the layout is inflated is a good idea
         //it 'should' ensure that the map has a writable location for the map cache, even without permissions
-        //if no tiles are displayed, you can try overriding the cache path using Configuration.getInstance().setCachePath
-        //see also StorageUtils
-        //note, the load method also sets the HTTP User Agent to your application's package name, if you abuse osm's
-        //tile servers will get you banned based on this string.
 
         //inflate and create the map
         setContentView(R.layout.activity_main)
@@ -89,15 +86,18 @@ class MainActivity : AppCompatActivity() {
 
 
         //Web view and default massage when no article selected
-        val webView: WebView = findViewById(R.id.webview)
+        webView = findViewById(R.id.webview)
         val helloMessage = resources.getString(R.string.hello_message)
-        webView.loadData("<h2 style='text-align:center; margin: 4em auto; color: gray'>${helloMessage}</h2>", "text/html", "UTF-8")
+        webView.loadData("<h2 style='text-align:center; margin: 2em auto; color: gray'>${helloMessage.replace("\n", "<br>")}</h2>", "text/html", "UTF-8")
 
 
 
         // setup the overlay with clickable points to open in webview
         updatePointsOverlay(items, webView)
 
+        slidingPaneLayout = findViewById(R.id.sliding_panel_layout)
+        val divider: View = findViewById(R.id.divider)
+        divider.setOnTouchListener(ResizeTouchListener())
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -127,18 +127,12 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         //this will refresh the osmdroid configuration on resuming.
-        //if you make changes to the configuration, use
-        //SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-        //Configuration.getInstance().load(this, PreferenceManager.getDefaultSharedPreferences(this));
         map.onResume() //needed for compass, my location overlays, v6.0.0 and up
     }
 
     override fun onPause() {
         super.onPause()
         //this will refresh the osmdroid configuration on resuming.
-        //if you make changes to the configuration, use
-        //SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-        //Configuration.getInstance().save(this, prefs);
         map.onPause()  //needed for compass, my location overlays, v6.0.0 and up
     }
 
@@ -309,7 +303,38 @@ class MainActivity : AppCompatActivity() {
         circleOverlay.outlinePaint.style = Paint.Style.STROKE
 
         map.overlays.add(circleOverlay)
-        //map.invalidate() // Refresh the map view
+    }
+
+    private inner class ResizeTouchListener : View.OnTouchListener {
+        private var initialY: Float = 0f
+        private var initialWeightMap: Float = 1f
+        private var initialWeightWebView: Float = 1f
+
+        override fun onTouch(v: View, event: MotionEvent): Boolean {
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    initialY = event.rawY
+                    initialWeightMap = (map.layoutParams as LinearLayout.LayoutParams).weight
+                    initialWeightWebView = (webView.layoutParams as LinearLayout.LayoutParams).weight
+                    return true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val deltaY = event.rawY - initialY
+                    val height = slidingPaneLayout.height.toFloat()
+                    val newWeightMap = initialWeightMap + deltaY / height
+                    val newWeightWebView = initialWeightWebView - deltaY / height
+
+                    if (newWeightMap > 0 && newWeightWebView > 0) {
+                        (map.layoutParams as LinearLayout.LayoutParams).weight = newWeightMap
+                        (webView.layoutParams as LinearLayout.LayoutParams).weight = newWeightWebView
+                        map.requestLayout()
+                        webView.requestLayout()
+                    }
+                    return true
+                }
+            }
+            return false
+        }
     }
 
 }
