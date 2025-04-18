@@ -3,6 +3,7 @@ package io.github.wasu_code.nearipedia
 import android.Manifest
 import android.app.Activity
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Paint
 import android.location.LocationManager
@@ -26,6 +27,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.util.MapTileIndex
 import org.osmdroid.views.MapView
@@ -49,7 +51,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var slidingPaneLayout: SlidingPaneLayout
     private var languagecode = Locale.getDefault().language //code of language used when displaying articles
     private lateinit var overlay: ItemizedOverlayWithFocus<OverlayItem>
-    private var searchRadius = 1000 //radious in meters to search for articles around given location
+    private var searchRadius = 1000 // radius (in meters) to search for articles around given location
+    private var appliedMapUrl: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -61,7 +64,7 @@ class MainActivity : AppCompatActivity() {
         initializeSlidingPanel()
         setupMap()
         setupOverlays() //add overlays like +/- buttons, compass
-        loadInitialArticles()//Icons on the map with a click listener
+        loadInitialArticles() //Icons on the map with a click listener
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -84,20 +87,58 @@ class MainActivity : AppCompatActivity() {
                 showLanguageMenu()
                 true
             }
+            R.id.action_settings -> {
+                val intent = Intent(this, SettingsActivity::class.java)
+                startActivity(intent)
+                true
+            }
             else -> super.onOptionsItemSelected(item)
         }
     }
 
     override fun onResume() {
         super.onResume()
-        //this will refresh the osmdroid configuration on resuming.
-        map.onResume() //needed for compass, my location overlays, v6.0.0 and up
+        map.onResume()
+        reloadMapTilesIfNeeded() // eg. when coming back from Settings
     }
+
+    private fun reloadMapTilesIfNeeded() {
+        val sharedPreferences = getSharedPreferences("prefs", Context.MODE_PRIVATE)
+        val newMapUrl = sharedPreferences.getString("customMapUrl", "")
+
+        if (!newMapUrl.isNullOrBlank() && newMapUrl != appliedMapUrl) {
+            val newTileSource = createCustomTileSource(newMapUrl)
+
+            map.setTileSource(newTileSource)
+            appliedMapUrl = newMapUrl // update the applied URL
+            map.invalidate()
+            Log.i("MAP_REFRESH", "Map tile source updated with new URL.")
+        }
+    }
+
+    private fun createCustomTileSource(url: String): OnlineTileSourceBase {
+        return object : OnlineTileSourceBase(
+            url, 0, 18, 256, "png", arrayOf(url)
+        ) {
+            override fun getTileURLString(pMapTileIndex: Long): String {
+                val z = MapTileIndex.getZoom(pMapTileIndex)
+                val x = MapTileIndex.getX(pMapTileIndex)
+                val y = MapTileIndex.getY(pMapTileIndex)
+                val newUrl =  baseUrl
+                    .replace("{z}", z.toString())
+                    .replace("{x}", x.toString())
+                    .replace("{y}", y.toString())
+
+                Log.i("MAP_EXAMPLE", newUrl)
+                return newUrl
+            }
+        }
+    }
+
 
     override fun onPause() {
         super.onPause()
-        //this will refresh the osmdroid configuration on resuming.
-        map.onPause()  //needed for compass, my location overlays, v6.0.0 and up
+        map.onPause()
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
@@ -112,7 +153,6 @@ class MainActivity : AppCompatActivity() {
                 getString(R.string.toast_location_permission),
                 Toast.LENGTH_SHORT
             ).show()
-            //finish()
         }
 
     }
@@ -171,32 +211,20 @@ class MainActivity : AppCompatActivity() {
     private fun setupMap() {
         map = findViewById(R.id.map)
 
+        val customMapUrl = getSharedPreferences("prefs", Context.MODE_PRIVATE)
+            .getString("customMapUrl", null)
 
-//        // Custom TileSource URL
-//        val customTileUrl = "https://a.tile.openstreetmap.de/{z}/{x}/{y}.png"
-//        // Create a new TileSource using your custom URL
-//        val customTileSource: ITileSource =
-//            XYTileSource("OpenStreetMap.de", 0, 18, 256, ".png", arrayOf(customTileUrl))
-//        map.setTileSource(customTileSource);
+        appliedMapUrl = customMapUrl
 
-//        map.setTileSource(TileSourceFactory.MAPNIK)
+        // Use the custom URL or fall back to OpenStreetMap if not set
+        val tileSource = if (!customMapUrl.isNullOrBlank()) {
+            createCustomTileSource(customMapUrl)
+        } else {
+            TileSourceFactory.MAPNIK
+        }
 
-        map.setTileSource(object : OnlineTileSourceBase(
-            "OpenStreetMap.de", 0, 18, 256, "png",
-            arrayOf<String>("https://a.tile.openstreetmap.de/")
-        ) {
-            override fun getTileURLString(pMapTileIndex: Long): String {
-                val url = (baseUrl
-                        + MapTileIndex.getZoom(pMapTileIndex)
-                        + "/" + MapTileIndex.getX(pMapTileIndex)
-                        + "/" + MapTileIndex.getY(pMapTileIndex)
-                        + "." + mImageFilenameEnding)
 
-                Log.i("MAP_EXAMPLE", url)
-
-                return url
-            }
-        })
+        map.setTileSource(tileSource)
 
         val mapController = map.controller
         mapController.setZoom(16.5)
@@ -279,7 +307,6 @@ class MainActivity : AppCompatActivity() {
             }
             override fun onItemLongPress(index:Int, item:OverlayItem):Boolean {
                 //do something on long pressing location marker
-                //TODO add article to favorites
                 return false
             }
         }, this)

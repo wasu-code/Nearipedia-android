@@ -6,4 +6,7 @@
     <string name="system_default">System Default</string>
     <string name="clear_points">Clear old points and show new</string>
     <string name="toast_location_permission">Location permission is mandatory for using this application</string>
+    <string name="enter_map_url_use_x_y_z_placeholders">Enter Map URL (use {x}, {y}, {z} placeholders)</string>
+    <string name="save_map_url">Save Map URL</string>
+    <string name="settings">Settings</string>
 </resources>
